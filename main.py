@@ -1,43 +1,41 @@
-from fastapi import FastAPI, HTTPException
+import os
 import yt_dlp
+from fastapi import FastAPI
+from fastapi.responses import FileResponse
+import uuid
 
 app = FastAPI()
 
 @app.get("/")
-def ana_sayfa():
-    return {"mesaj": "Video İndirici API'ye Hoş Geldiniz! /download?url=... kullanarak test edin."}
+def home():
+    return {"message": "TikTok Downloader (Render) Calisiyor. /download?url=... kullanin."}
 
 @app.get("/download")
-def video_bilgisi_getir(url: str):
-    """
-    Verilen YouTube/Instagram/TikTok linkini analiz eder 
-    ve indirme bağlantısını döner.
-    """
+async def download_video(url: str):
+    # Rastgele bir dosya adı oluştur
+    filename = f"{uuid.uuid4()}.mp4"
+    
+    # yt-dlp ayarları (Basit ve hızlı)
+    ydl_opts = {
+        'format': 'best',    # En iyi kaliteyi seç
+        'outtmpl': filename, # Dosya adı
+        'quiet': True,       # Logları gizle
+        'no_warnings': True,
+    }
+
     try:
-        # Ayarlar: Videoyu sunucuya indirme, sadece linkini bul.
-        ydl_opts = {
-            'format': 'best',  # En iyi kaliteyi bul
-            'quiet': True,     # Gereksiz log yapma
-            'no_warnings': True,
-        }
-
-        # yt-dlp motorunu çalıştır
+        # Videoyu sunucuya indir
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Bilgileri çek (Ama indirme yapma: download=False)
-            info = ydl.extract_info(url, download=False)
+            ydl.download([url])
             
-            # Gerekli bilgileri ayıkla
-            video_baslik = info.get('title', 'Bilinmeyen Başlık')
-            video_resmi = info.get('thumbnail', '')
-            video_linki = info.get('url', '') # İşte asıl hazine bu!
-            
-            return {
-                "baslik": video_baslik,
-                "resim": video_resmi,
-                "indirme_linki": video_linki,
-                "platform": info.get('extractor_key', 'Bilinmiyor')
-            }
+        # İndirilen dosyayı kullanıcıya gönder
+        return FileResponse(path=filename, filename="tiktok_video.mp4", media_type="video/mp4")
 
-    except Exception as hata:
-        # Eğer bir sorun çıkarsa (Link bozuksa vs.)
-        return {"hata": str(hata), "durum": "Video bulunamadi veya link hatali."}
+    except Exception as e:
+        # Hata olursa temizlik yap ve hatayı söyle
+        if os.path.exists(filename):
+            os.remove(filename)
+        return {"error": str(e), "status": "Hata oluştu."}
+
+# Render'da sunucuyu başlatmak için gerekli kısım
+# (requirements.txt içinde uvicorn olduğu için burası otomatik çalışır ama dosya sonunda dursun)
